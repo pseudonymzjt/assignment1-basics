@@ -138,7 +138,7 @@ if __name__ == "__main__":
         token_str = token_bytes.decode("utf-8", errors="replace")
         print(f"ID: {token_id:<6} | Byte Length: {len(token_bytes):<3} | Content: {repr(token_str)}")
     longest_tokens = sorted(ts_tokenizer.vocab.items(), key=lambda x: len(x[1]), reverse=True)[:10]
-    print("\n--- Longest Tokens in OWT Vocab ---")
+    print("\n--- Longest Tokens in TS Vocab ---")
     for token_id, token_bytes in longest_tokens:
         token_str = token_bytes.decode("utf-8", errors="replace")
         print(f"ID: {token_id:<6} | Byte Length: {len(token_bytes):<3} | Content: {repr(token_str)}")
@@ -177,6 +177,8 @@ if __name__ == "__main__":
     total_seconds = pile_size_mb / throughput_mb_s
     print(f"Estimated time for 825GB Pile: {total_seconds / 3600 / 24:.2f} days (单核)")
 
-# 执行全量数据集的序列化
-# tokenize_and_save_to_bin(tokenizer, "data/TinyStoriesV2-GPT4-train.txt", "train.bin")
-# tokenize_and_save_to_bin(tokenizer, "data/TinyStoriesV2-GPT4-valid.txt", "val.bin")
+    # 执行全量数据集的序列化
+    # tokenize_and_save_to_bin(ts_tokenizer, "data/TinyStoriesV2-GPT4-train.txt", "output/ts_train.bin")
+    # tokenize_and_save_to_bin(ts_tokenizer, "data/TinyStoriesV2-GPT4-valid.txt", "output/ts_val.bin")
+    tokenize_and_save_to_bin(owt_tokenizer, "data/owt_train.txt", "output/owt_train.bin")
+    tokenize_and_save_to_bin(owt_tokenizer, "data/owt_valid.txt", "output/owt_val.bin")

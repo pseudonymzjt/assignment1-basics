@@ -28,8 +28,10 @@ def run_linear(
     Returns:
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
-
-    raise NotImplementedError
+    from cs336_basics.linear import Linear
+    run_linear = Linear(d_in, d_out, 'cuda')
+    run_linear.load_state_dict({'weight': weights})
+    return run_linear.forward(in_features)
 
 
 def run_embedding(
@@ -50,8 +52,10 @@ def run_embedding(
     Returns:
         Float[Tensor, "... d_model"]: Batch of embeddings returned by your Embedding layer.
     """
-
-    raise NotImplementedError
+    from cs336_basics.embedding import Embedding
+    run_embedding = Embedding(vocab_size, d_model, 'cuda')
+    run_embedding.load_state_dict({'weight': weights})
+    return run_embedding.forward(token_ids)
 
 
 def run_swiglu(
@@ -83,7 +87,14 @@ def run_swiglu(
     # swiglu.w1.weight.data = w1_weight
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
-    raise NotImplementedError
+    from cs336_basics.network import SwiGLU
+    run_swiglu = SwiGLU(d_model, d_ff, 'cuda')
+    weights = {}
+    weights['w1.weight'] = w1_weight
+    weights['w2.weight'] = w2_weight
+    weights['w3.weight'] = w3_weight
+    run_swiglu.load_state_dict(weights)
+    return run_swiglu.forward(in_features)
 
 
 def run_scaled_dot_product_attention(
@@ -200,8 +211,9 @@ def run_rope(
     Returns:
         Float[Tensor, " ... sequence_length d_k"]: Tensor with RoPEd input.
     """
-    raise NotImplementedError
-
+    from cs336_basics.embedding import RotaryPositionalEmbedding
+    RoPE = RotaryPositionalEmbedding(theta, d_k, max_seq_len, device = 'cuda')
+    return RoPE.forward(in_query_or_key, token_positions)
 
 def run_transformer_block(
     d_model: int,
@@ -378,8 +390,10 @@ def run_rmsnorm(
         Float[Tensor,"... d_model"]: Tensor of with the same shape as `in_features` with the output of running
         RMSNorm of the `in_features`.
     """
-    raise NotImplementedError
-
+    from cs336_basics.norm import RMSNorm
+    run_rmsnorm = RMSNorm(d_model, eps, 'cuda')
+    run_rmsnorm.load_state_dict({'weight': weights})
+    return run_rmsnorm.forward(in_features)
 
 def run_silu(in_features: Float[Tensor, " ..."]) -> Float[Tensor, " ..."]:
     """Given a tensor of inputs, return the output of applying SiLU
