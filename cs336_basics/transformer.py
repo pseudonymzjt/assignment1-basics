@@ -26,13 +26,36 @@ class Transformer(nn.Module):
     def __init__(self, d_model, num_heads, d_ff, theta,
                  weights, vocab_size, context_length, num_layers):
         super().__init__()
+        
+        # 保存配置
+        self.d_model = d_model
+        self.num_heads = num_heads
+        self.d_ff = d_ff
+        self.theta = theta
+        self.vocab_size = vocab_size
+        self.context_length = context_length
+        self.num_layers = num_layers
 
+        # 初始化所有层（随机初始化）
         self.token_embeddings = Embedding(vocab_size, d_model)
+        
+        self.blocks = nn.ModuleList([
+            Block(d_model, num_heads, d_ff, context_length, theta)
+            for _ in range(num_layers)
+        ])
+        
+        self.ln_final = RMSNorm(d_model)
+        self.lm_head = Linear(d_model, vocab_size)
+        
+        # 如果提供了权重，加载它们
+        if weights is not None:
+            self._load_weights(weights)
+    
+    def _load_weights(self, weights):
+        """从字典加载预训练权重"""
         self.token_embeddings.weight = nn.Parameter(weights["token_embeddings.weight"])
-
-        self.blocks = nn.ModuleList()
-        for i in range(num_layers):
-            block = Block(d_model, num_heads, d_ff, context_length, theta)
+        
+        for i, block in enumerate(self.blocks):
             block.attn.W_Q = nn.Parameter(weights[f"layers.{i}.attn.q_proj.weight"])
             block.attn.W_K = nn.Parameter(weights[f"layers.{i}.attn.k_proj.weight"])
             block.attn.W_V = nn.Parameter(weights[f"layers.{i}.attn.v_proj.weight"])
@@ -42,13 +65,8 @@ class Transformer(nn.Module):
             block.ffn.w1.weight = nn.Parameter(weights[f"layers.{i}.ffn.w1.weight"])
             block.ffn.w2.weight = nn.Parameter(weights[f"layers.{i}.ffn.w2.weight"])
             block.ffn.w3.weight = nn.Parameter(weights[f"layers.{i}.ffn.w3.weight"])
-            self.blocks.append(block)
-
-        self.ln_final = RMSNorm(d_model)
+        
         self.ln_final.weight = nn.Parameter(weights["ln_final.weight"])
-
-        # lm_head: (vocab_size, d_model)
-        self.lm_head = nn.Linear(d_model, vocab_size, bias=False)
         self.lm_head.weight = nn.Parameter(weights["lm_head.weight"])
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -62,3 +80,4 @@ class Transformer(nn.Module):
 
         # (batch, seq_len, vocab_size)
         return self.lm_head(out)
+

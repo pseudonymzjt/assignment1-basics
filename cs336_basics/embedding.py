@@ -2,7 +2,7 @@ import torch
 
 
 class Embedding(torch.nn.Module):
-    def __init__(self, num_embeddings, embedding_dim, device = None, dtype = None):
+    def __init__(self, num_embeddings, embedding_dim, device=None, dtype=None):
         '''
         num_embeddings: int  Size of the vocabulary
         embedding_dim: int  Dimension of the embedding vectors, i.e., d_model
@@ -14,7 +14,7 @@ class Embedding(torch.nn.Module):
         self.embedding_dim = embedding_dim
         self.device = device
         self.dtype = dtype
-        tensor = torch.empty((num_embeddings, embedding_dim), device = self.device, dtype = self.dtype)
+        tensor = torch.empty((num_embeddings, embedding_dim), device=self.device, dtype=self.dtype)
         self.weight = torch.nn.Parameter(torch.nn.init.trunc_normal_(tensor))
 
     def forward(self, token_ids: torch.Tensor) -> torch.Tensor: 
@@ -47,17 +47,29 @@ class RotaryPositionalEmbedding(torch.nn.Module):
         i = torch.arange(max_seq_len).unsqueeze(1)  # (max_seq_len, 1)
         k = torch.arange(d_k // 2)  # (d_k // 2,)
         freqs = 1.0 / (theta ** (2 * k / d_k))  # (d_k // 2,)
-        theta_matrix = (i * freqs).to(device) if device else i * freqs  # (max_seq_len, d_k // 2)
+        theta_matrix = i * freqs  # (max_seq_len, d_k // 2)
         
-        self.register_buffer('cos_cache', torch.cos(theta_matrix), persistent=False)
-        self.register_buffer('sin_cache', torch.sin(theta_matrix), persistent=False)
+        # 计算 cos 和 sin
+        cos_cache = torch.cos(theta_matrix)
+        sin_cache = torch.sin(theta_matrix)
+        
+        # 注册为 buffer（如果指定了 device，移到该设备上）
+        if device is not None:
+            cos_cache = cos_cache.to(device)
+            sin_cache = sin_cache.to(device)
+        
+        self.register_buffer('cos_cache', cos_cache, persistent=False)
+        self.register_buffer('sin_cache', sin_cache, persistent=False)
 
     def forward(self, x: torch.Tensor, token_positions: torch.Tensor) -> torch.Tensor:
         # x: (..., seq_len, d_k)
         # token_positions: (..., seq_len)
-        if self.device:
-            token_positions = token_positions.to(self.device)
-            x = x.to(self.device)
+        
+        # 确保输入在正确的设备上（使用缓存的设备）
+        if x.device != self.cos_cache.device:
+            x = x.to(self.cos_cache.device)
+        if token_positions.device != self.cos_cache.device:
+            token_positions = token_positions.to(self.cos_cache.device)
 
         cos = self.cos_cache[token_positions]  # (..., seq_len, d_k // 2)
         sin = self.sin_cache[token_positions]  # (..., seq_len, d_k // 2)

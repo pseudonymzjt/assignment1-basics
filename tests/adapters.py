@@ -29,7 +29,7 @@ def run_linear(
         Float[Tensor, "... d_out"]: The transformed output of your linear module.
     """
     from cs336_basics.linear import Linear
-    run_linear = Linear(d_in, d_out, 'cuda')
+    run_linear = Linear(d_in, d_out)
     run_linear.load_state_dict({'weight': weights})
     return run_linear.forward(in_features)
 
@@ -88,7 +88,7 @@ def run_swiglu(
     # swiglu.w2.weight.data = w2_weight
     # swiglu.w3.weight.data = w3_weight
     from cs336_basics.network import SwiGLU
-    run_swiglu = SwiGLU(d_model, d_ff, 'cuda')
+    run_swiglu = SwiGLU(d_model, d_ff)
     weights = {}
     weights['w1.weight'] = w1_weight
     weights['w2.weight'] = w2_weight
@@ -193,8 +193,8 @@ def run_multihead_self_attention_with_rope(
         implementation with the given QKV projection weights and input features.
     """
     from cs336_basics.attention import MultiHeadAttention
-    MHA = MultiHeadAttention(d_model, num_heads, q_proj_weight, k_proj_weight, v_proj_weight, o_proj_weight)
-    return MHA.forward(in_features, max_seq_len, theta, token_positions)
+    MHA = MultiHeadAttention(d_model, num_heads, q_proj_weight, k_proj_weight, v_proj_weight, o_proj_weight, max_seq_len, theta, token_positions)
+    return MHA.forward(in_features)
 
 
 def run_rope(
@@ -451,7 +451,8 @@ def run_get_batch(
         is the sampled input sequences, and the second tuple item is the corresponding
         language modeling labels.
     """
-    raise NotImplementedError
+    from cs336_basics.data import get_batch
+    return get_batch(dataset, batch_size, context_length, device)
 
 
 def run_softmax(in_features: Float[Tensor, " ..."], dim: int) -> Float[Tensor, " ..."]:
@@ -486,7 +487,7 @@ def run_cross_entropy(
     Returns:
         Float[Tensor, ""]: The average cross-entropy loss across examples.
     """
-    from torch.nn.functional import cross_entropy
+    from cs336_basics.attention import cross_entropy
     return cross_entropy(inputs, targets)
 
 
@@ -556,7 +557,8 @@ def run_save_checkpoint(
             we've completed.
         out (str | os.PathLike | BinaryIO | IO[bytes]): Path or file-like object to serialize the model, optimizer, and iteration to.
     """
-    raise NotImplementedError
+    from cs336_basics.data import save_checkpoint
+    save_checkpoint(model, optimizer, iteration, out)
 
 
 def run_load_checkpoint(
@@ -577,7 +579,8 @@ def run_load_checkpoint(
     Returns:
         int: the previously-serialized number of iterations.
     """
-    raise NotImplementedError
+    from cs336_basics.data import load_checkpoint
+    return load_checkpoint(src, model, optimizer)
 
 
 def get_tokenizer(
