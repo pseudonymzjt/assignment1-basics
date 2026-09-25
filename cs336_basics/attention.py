@@ -88,6 +88,7 @@ class MultiHeadAttention(nn.Module):
         max_seq_len: int | None = None,
         theta: float | None = None,
         token_positions: torch.Tensor | None = None,
+        use_rope: bool = True
     ):
         super().__init__()
         assert d_model % num_heads == 0
@@ -107,7 +108,7 @@ class MultiHeadAttention(nn.Module):
 
         # 在初始化时创建 RoPE（如果需要）
         self.rope = None
-        if max_seq_len is not None and theta is not None:
+        if use_rope and max_seq_len is not None and theta is not None:
             from cs336_basics.embedding import RotaryPositionalEmbedding
             self.rope = RotaryPositionalEmbedding(theta, self.d_k, max_seq_len)
 

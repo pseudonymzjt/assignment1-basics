@@ -272,17 +272,18 @@ def train(
     # 创建模型
     logger.log_text("Initializing model...")
     model = Transformer(
-        d_model=d_model,
-        num_heads=num_heads,
-        d_ff=d_ff,
-        theta=rope_theta,
+        d_model=args.d_model,
+        num_heads=args.num_heads,
+        d_ff=args.d_ff,
+        theta=args.rope_theta,
         weights=None,
-        vocab_size=vocab_size,
-        context_length=context_length,
-        num_layers=num_layers
-    )
-
-    model = model.to(device)
+        vocab_size=args.vocab_size,
+        context_length=args.context_length,
+        num_layers=args.num_layers,
+        norm_type=args.norm_type,         # <-- 传入
+        norm_position=args.norm_position, # <-- 传入
+        use_rope=(not args.no_rope),
+    ).to(device)
     
     # 优化器
     optimizer = torch.optim.AdamW(
@@ -340,6 +341,15 @@ def train(
         # 反向传播
         optimizer.zero_grad()
         loss.backward()
+
+        # 裁剪模型全部参数的梯度的 L2 范数，阈值设为 1.0
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+        # ==============================================================
+
+        # 检测是否发散 (NaN / Inf)，遇到发散优雅退出
+        if torch.isnan(loss) or torch.isinf(loss):
+            logger.log_text(f"\n[DIVERGENCE DETECTED] Loss became {loss.item()} at iteration {iteration}! Exiting early.")
+            break
         optimizer.step()
         
         # 计算时间
@@ -474,6 +484,11 @@ if __name__ == "__main__":
     
     # 设备
     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
+
+    # 消融实验
+    parser.add_argument("--norm_type", type=str, default="rmsnorm", choices=["rmsnorm", "none"], help="Type of normalization")
+    parser.add_argument("--norm_position", type=str, default="pre", choices=["pre", "post"], help="Position of normalization: pre or post")
+    parser.add_argument("--no_rope", action="store_true", help="Disable RoPE (implement NoPE)")
     
     args = parser.parse_args()
     
