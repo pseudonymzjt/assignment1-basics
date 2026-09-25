@@ -167,3 +167,4 @@ AGENTS.md
 CLAUDE.md
 output/
 checkpoints/
+*.tar.gz

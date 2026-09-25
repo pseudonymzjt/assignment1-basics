@@ -10,6 +10,7 @@ from typing import Optional
 import numpy as np
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from cs336_basics.attention import cross_entropy
 from cs336_basics.data import get_batch, load_checkpoint, save_checkpoint
@@ -161,8 +162,8 @@ def estimate_loss(model, train_data, val_data, batch_size, context_length,
         for _ in range(eval_iters):
             inputs, targets = get_batch(data, batch_size, context_length, device)
             logits = model(inputs)
-            loss = cross_entropy(
-                logits.view(-1, logits.size(-1)), 
+            loss = F.cross_entropy(
+                logits.view(-1, logits.size(-1)).float(), 
                 targets.view(-1)
             )
             total_loss += loss.item()
@@ -283,8 +284,12 @@ def train(
         norm_type=args.norm_type,         # <-- 传入
         norm_position=args.norm_position, # <-- 传入
         use_rope=(not args.no_rope),
+        ffn_type=args.ffn_type,
     ).to(device)
-    
+
+    model.train()
+    model = torch.compile(model)
+
     # 优化器
     optimizer = torch.optim.AdamW(
         model.parameters(), 
@@ -306,14 +311,15 @@ def train(
     logger.log_text(f"Iterations: {start_iter} -> {max_iters}")
     logger.log_text(f"Learning rate: {learning_rate} -> {min_learning_rate}")
     logger.log_text(f"Device: {device}")
-    logger.log_text("="*70)
-    
-    model.train()
-    model = torch.compile(model)
+    logger.log_text("="*70)    
+
 
     training_start_time = time.time()
     last_log_time = training_start_time
-    
+
+    # 临时测试：把 get_batch 提到循环外面，只取一次！
+    # fixed_inputs, fixed_targets = get_batch(train_data, batch_size, context_length, device)
+
     for iteration in range(start_iter, max_iters):
         iter_start_time = time.time()
         
@@ -330,11 +336,14 @@ def train(
         
         # 获取batch
         inputs, targets = get_batch(train_data, batch_size, context_length, device)
-        
+        # inputs, targets = fixed_inputs, fixed_targets
+
         # 前向传播
+        # with torch.autocast(device_type="cuda", dtype = torch.bfloat16):
         logits = model(inputs)
-        loss = cross_entropy(
-            logits.view(-1, logits.size(-1)), 
+        # print(f"--> [Logits 探针] min={logits.min().item():.4f}, max={logits.max().item():.4f}, std={logits.std().item():.6f}")
+        loss = F.cross_entropy(
+            logits.view(-1, logits.size(-1)).float(), 
             targets.view(-1)
         )
         
@@ -350,7 +359,12 @@ def train(
         if torch.isnan(loss) or torch.isinf(loss):
             logger.log_text(f"\n[DIVERGENCE DETECTED] Loss became {loss.item()} at iteration {iteration}! Exiting early.")
             break
+
+        # p_before = next(model.parameters()).data.clone()
         optimizer.step()
+        # 在 optimizer.step() 之后比对
+        # weight_diff = (next(model.parameters()).data - p_before).abs().sum().item()
+        # print(f"--> [权重更新检查] Step 权重实际变化量: {weight_diff:.8e}")
         
         # 计算时间
         iter_time = time.time() - iter_start_time
@@ -489,6 +503,7 @@ if __name__ == "__main__":
     parser.add_argument("--norm_type", type=str, default="rmsnorm", choices=["rmsnorm", "none"], help="Type of normalization")
     parser.add_argument("--norm_position", type=str, default="pre", choices=["pre", "post"], help="Position of normalization: pre or post")
     parser.add_argument("--no_rope", action="store_true", help="Disable RoPE (implement NoPE)")
+    parser.add_argument("--ffn_type", type=str, default="swiglu", choices=["swiglu", "silu"], help="FFN architecture: swiglu or silu")
     
     args = parser.parse_args()
     

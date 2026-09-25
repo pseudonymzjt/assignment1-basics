@@ -3,7 +3,7 @@ from torch import nn
 
 from cs336_basics.attention import MultiHeadAttention, softmax
 from cs336_basics.embedding import Embedding
-from cs336_basics.network import SwiGLU
+from cs336_basics.network import SwiGLU, SiLUFFN
 from cs336_basics.norm import RMSNorm
 from cs336_basics.linear import Linear
 
@@ -19,6 +19,7 @@ class Block(nn.Module):
         norm_type: str = "rmsnorm",       # [插入] 'rmsnorm' 或 'none'
         norm_position: str = "pre",       # [插入] 'pre' 或 'post'
         use_rope: bool = True,          # [插入] 新增参数，默认使用 RoPE
+        ffn_type: str = "swiglu",         # [插入] 'swiglu' 或 'silu'
     ):
         super().__init__()
         self.norm_position = norm_position
@@ -31,8 +32,14 @@ class Block(nn.Module):
             self.ln1 = RMSNorm(d_model)
             self.ln2 = RMSNorm(d_model)
 
+        # [插入] 根据 ffn_type 选择 FFN 实现
+        if ffn_type == "silu":
+            self.ffn = SiLUFFN(d_model, d_ff)
+        else:
+            self.ffn = SwiGLU(d_model, d_ff)
+
         self.attn = MultiHeadAttention(d_model, num_heads, max_seq_len=max_seq_len, theta=theta, use_rope=use_rope)
-        self.ffn = SwiGLU(d_model, d_ff)
+        # self.ffn = SwiGLU(d_model, d_ff)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         # [插入] 兼容 Post-Norm 与 Pre-Norm
@@ -61,6 +68,7 @@ class Transformer(nn.Module):
         norm_type: str = "rmsnorm",       # [插入] 新增参数，默认保持原有行为
         norm_position: str = "pre",       # [插入] 新增参数，默认 pre-norm
         use_rope: bool = True,          # [插入] 新增参数，默认使用 RoPE
+        ffn_type: str = "swiglu",         # [插入] 新增参数，默认 swiglu
     ):
         super().__init__()
         
@@ -88,6 +96,7 @@ class Transformer(nn.Module):
                 norm_type=norm_type,
                 norm_position=norm_position,
                 use_rope=use_rope,
+                ffn_type=ffn_type,
             )
             for _ in range(num_layers)
         ])
@@ -120,7 +129,9 @@ class Transformer(nn.Module):
                 block.ln2.weight = nn.Parameter(weights[f"layers.{i}.ln2.weight"])
             block.ffn.w1.weight = nn.Parameter(weights[f"layers.{i}.ffn.w1.weight"])
             block.ffn.w2.weight = nn.Parameter(weights[f"layers.{i}.ffn.w2.weight"])
-            block.ffn.w3.weight = nn.Parameter(weights[f"layers.{i}.ffn.w3.weight"])
+            # [插入] SiLUFFN 没有 w3，避免 KeyError
+            if hasattr(block.ffn, "w3"):
+                block.ffn.w3.weight = nn.Parameter(weights[f"layers.{i}.ffn.w3.weight"])
         
         if hasattr(self.ln_final, "weight"):
             self.ln_final.weight = nn.Parameter(weights["ln_final.weight"])

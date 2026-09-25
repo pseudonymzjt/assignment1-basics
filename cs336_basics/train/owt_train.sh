@@ -1,0 +1,17 @@
+python cs336_basics/train/training_loop.py \
+    --train_data "output/owt_train.bin" \
+    --val_data "output/owt_val.bin" \
+    --vocab_size 35000 \
+    --d_model 512 \
+    --num_layers 4 \
+    --num_heads 16 \
+    --d_ff 1344 \
+    --context_length 256 \
+    --batch_size 32 \
+    --max_iters 5000 \
+    --warmup_iters 200 \
+    --cosine_cycle_iters 5000 \
+    --eval_interval 250 \
+    --log_interval 50 \
+    --learning_rate 3e-3 \
+    --experiment_name "owt_pre_run"
